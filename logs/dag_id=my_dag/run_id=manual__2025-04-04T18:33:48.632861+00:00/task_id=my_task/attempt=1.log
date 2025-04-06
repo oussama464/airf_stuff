@@ -1,0 +1,23 @@
+[2025-04-04T18:33:49.336+0000] {local_task_job_runner.py:123} INFO - ::group::Pre task execution logs
+[2025-04-04T18:33:49.354+0000] {taskinstance.py:2614} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: my_dag.my_task manual__2025-04-04T18:33:48.632861+00:00 [queued]>
+[2025-04-04T18:33:49.363+0000] {taskinstance.py:2614} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: my_dag.my_task manual__2025-04-04T18:33:48.632861+00:00 [queued]>
+[2025-04-04T18:33:49.364+0000] {taskinstance.py:2867} INFO - Starting attempt 1 of 1
+[2025-04-04T18:33:49.378+0000] {taskinstance.py:2890} INFO - Executing <Task(PythonOperator): my_task> on 2025-04-04 18:33:48.632861+00:00
+[2025-04-04T18:33:49.386+0000] {warnings.py:112} WARNING - /home/***/.local/lib/python3.12/site-packages/***/task/task_runner/standard_task_runner.py:70: DeprecationWarning: This process (pid=392) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  pid = os.fork()
+
+[2025-04-04T18:33:49.388+0000] {standard_task_runner.py:72} INFO - Started process 393 to run task
+[2025-04-04T18:33:49.388+0000] {standard_task_runner.py:104} INFO - Running: ['***', 'tasks', 'run', 'my_dag', 'my_task', 'manual__2025-04-04T18:33:48.632861+00:00', '--job-id', '6', '--raw', '--subdir', 'DAGS_FOLDER/example1.py', '--cfg-path', '/tmp/tmpblz20cq7']
+[2025-04-04T18:33:49.389+0000] {standard_task_runner.py:105} INFO - Job 6: Subtask my_task
+[2025-04-04T18:33:49.426+0000] {task_command.py:467} INFO - Running <TaskInstance: my_dag.my_task manual__2025-04-04T18:33:48.632861+00:00 [running]> on host d494197b718d
+[2025-04-04T18:33:49.501+0000] {taskinstance.py:3134} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='***' AIRFLOW_CTX_DAG_ID='my_dag' AIRFLOW_CTX_TASK_ID='my_task' AIRFLOW_CTX_EXECUTION_DATE='2025-04-04T18:33:48.632861+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-04-04T18:33:48.632861+00:00'
+[2025-04-04T18:33:49.501+0000] {taskinstance.py:732} INFO - ::endgroup::
+[2025-04-04T18:33:49.513+0000] {logging_mixin.py:190} INFO - ###################
+[2025-04-04T18:33:49.513+0000] {logging_mixin.py:190} INFO - manual
+[2025-04-04T18:33:49.514+0000] {logging_mixin.py:190} INFO - ###################
+[2025-04-04T18:33:49.514+0000] {python.py:240} INFO - Done. Returned value was: None
+[2025-04-04T18:33:49.526+0000] {taskinstance.py:341} INFO - ::group::Post task execution logs
+[2025-04-04T18:33:49.526+0000] {taskinstance.py:353} INFO - Marking task as SUCCESS. dag_id=my_dag, task_id=my_task, run_id=manual__2025-04-04T18:33:48.632861+00:00, execution_date=20250404T183348, start_date=20250404T183349, end_date=20250404T183349
+[2025-04-04T18:33:49.562+0000] {local_task_job_runner.py:266} INFO - Task exited with return code 0
+[2025-04-04T18:33:49.597+0000] {taskinstance.py:3901} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2025-04-04T18:33:49.600+0000] {local_task_job_runner.py:245} INFO - ::endgroup::
