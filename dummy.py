@@ -1,46 +1,128 @@
-{'conf': <Proxy at 0x723742436cc0 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'conf', <***.configuration.AirflowConfigParser object at 0x72374c07e630>)>,
- 'conn': None,
- 'dag': <DAG: my_dag>,
- 'dag_run': <DagRun my_dag @ 2025-03-28 00:00:00+00:00: scheduled__2025-03-28T00:00:00+00:00, state:running, queued_at: 2025-03-29 20:03:52.451120+00:00. externally triggered: False>,
- 'data_interval_end': DateTime(2025, 3, 29, 0, 0, 0, tzinfo=Timezone('UTC')),
- 'data_interval_start': DateTime(2025, 3, 28, 0, 0, 0, tzinfo=Timezone('UTC')),
- 'ds': '2025-03-28',
- 'ds_nodash': '20250328',
- 'execution_date': <Proxy at 0x7237424f5b00 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'execution_date', DateTime(2025, 3, 28, 0, 0, 0, tzinfo=Timezone('UTC')))>,
- 'expanded_ti_count': None,
- 'inlet_events': InletEventsAccessors(_inlets=[], _datasets={}, _dataset_aliases={}, _session=<sqlalchemy.orm.session.Session object at 0x72374be9c380>),
- 'inlets': [],
- 'logical_date': DateTime(2025, 3, 28, 0, 0, 0, tzinfo=Timezone('UTC')),
- 'macros': <module '***.macros' from '/home/***/.local/lib/python3.12/site-packages/***/macros/__init__.py'>,
- 'map_index_template': None,
- 'next_ds': <Proxy at 0x72374245a240 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'next_ds', '2025-03-29')>,
- 'next_ds_nodash': <Proxy at 0x7237425d0f40 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'next_ds_nodash', '20250329')>,
- 'next_execution_date': <Proxy at 0x723742378180 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'next_execution_date', DateTime(2025, 3, 29, 0, 0, 0, tzinfo=Timezone('UTC')))>,
- 'outlet_events': <***.utils.context.OutletEventAccessors object at 0x7237424ff1a0>,
- 'outlets': [],
- 'params': {},
- 'prev_data_interval_end_success': None,
- 'prev_data_interval_start_success': None,
- 'prev_ds': <Proxy at 0x723742329200 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'prev_ds', '2025-03-27')>,
- 'prev_ds_nodash': <Proxy at 0x72374232bb40 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'prev_ds_nodash', '20250327')>,
- 'prev_end_date_success': None,
- 'prev_execution_date': <Proxy at 0x7237424fbcc0 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'prev_execution_date', DateTime(2025, 3, 27, 0, 0, 0, tzinfo=Timezone('UTC')))>,
- 'prev_execution_date_success': <Proxy at 0x7237424c7280 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'prev_execution_date_success', None)>,
- 'prev_start_date_success': None,
- 'run_id': 'scheduled__2025-03-28T00:00:00+00:00',
- 'task': <Task(PythonOperator): my_task>,
- 'task_instance': <TaskInstance: my_dag.my_task scheduled__2025-03-28T00:00:00+00:00 [running]>,
- 'task_instance_key_str': 'my_dag__my_task__20250328',
- 'templates_dict': None,
- 'test_mode': False,
- 'ti': <TaskInstance: my_dag.my_task scheduled__2025-03-28T00:00:00+00:00 [running]>,
- 'tomorrow_ds': <Proxy at 0x7237423eae40 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'tomorrow_ds', '2025-03-29')>,
- 'tomorrow_ds_nodash': <Proxy at 0x7237423eae00 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'tomorrow_ds_nodash', '20250329')>,
- 'triggering_dataset_events': <Proxy at 0x723742329d00 with factory <function _get_template_context.<locals>.get_triggering_events at 0x7237424cf740>>,
- 'ts': '2025-03-28T00:00:00+00:00',
- 'ts_nodash': '20250328T000000',
- 'ts_nodash_with_tz': '20250328T000000+0000',
- 'var': {'json': None, 'value': None},
- 'yesterday_ds': <Proxy at 0x7237423eac40 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'yesterday_ds', '2025-03-27')>,
- 'yesterday_ds_nodash': <Proxy at 0x7237423e9a80 with factory functools.partial(<function lazy_mapping_from_context.<locals>._deprecated_proxy_factory at 0x7237423349a0>, 'yesterday_ds_nodash', '20250327')>}
-[2025-03-29, 20:03:53 UTC] {python.py:240} INFO - Done. Returned value was: None
+import ast
+import re
+import sys
+
+import polars as pl
+
+# Regex patterns to identify pieces in the docstring
+DOC_PRODUCER       = re.compile(r'Producer of\s+`([^`]+)`', re.IGNORECASE)
+DOC_PRIMARY_SOURCE = re.compile(r'Primary Source:\s+`([^`]+)`', re.IGNORECASE)
+BACKTICK_COL       = re.compile(r'`(\w+)`')
+SECTION_HEADER     = re.compile(r'^(Filtering|Transformation|Enrichment|Default):', re.IGNORECASE)
+
+# Patterns for extracting specific columns in each section
+TRANSFORM_LINE = re.compile(r'^\s*-\s*(\w+)\s*:', re.IGNORECASE)
+ENRICH_LINE    = re.compile(r'^\s*-\s*(\w+)\s+from', re.IGNORECASE)
+DEFAULT_LINE   = re.compile(r'^\s*-\s*(\w+)', re.IGNORECASE)
+
+
+def extract_from_docstring(doc: str):
+    """
+    Parse a transform-method docstring to extract:
+      - producer
+      - primary_source
+      - source_cols (from Filtering section)
+      - transform_cols (from Transformation section)
+      - enrichment_cols (from Enrichment section)
+      - default_cols (from Default section)
+    """
+    # Find producer and primary source
+    producer_match       = DOC_PRODUCER.search(doc)
+    primary_source_match = DOC_PRIMARY_SOURCE.search(doc)
+
+    # Containers for each category
+    source_cols     = []
+    transform_cols  = []
+    enrichment_cols = []
+    default_cols    = []
+
+    # Track current section
+    current_section = None
+    for line in doc.splitlines():
+        header = SECTION_HEADER.match(line)
+        if header:
+            current_section = header.group(1).lower()
+            continue
+
+        if current_section == 'filtering':
+            # collect backtick-quoted column names
+            for col in BACKTICK_COL.findall(line):
+                source_cols.append(col)
+
+        elif current_section == 'transformation':
+            m = TRANSFORM_LINE.match(line)
+            if m:
+                transform_cols.append(m.group(1))
+
+        elif current_section == 'enrichment':
+            m = ENRICH_LINE.match(line)
+            if m:
+                enrichment_cols.append(m.group(1))
+
+        elif current_section == 'default':
+            m = DEFAULT_LINE.match(line)
+            if m:
+                default_cols.append(m.group(1))
+
+    # Deduplicate while preserving order
+    def dedupe(seq):
+        return list(dict.fromkeys(seq))
+
+    return {
+        'producer':        producer_match.group(1) if producer_match else None,
+        'primary_source':  primary_source_match.group(1) if primary_source_match else None,
+        'source_cols':     dedupe(source_cols),
+        'transform_cols':  dedupe(transform_cols),
+        'enrichment_cols': dedupe(enrichment_cols),
+        'default_cols':    dedupe(default_cols),
+    }
+
+
+def analyze_file(path: str):
+    """
+    Parse a Python file, find all 'transform' methods inside classes,
+    extract their docstrings, and pull structured information out.
+    """
+    with open(path, 'r', encoding='utf8') as f:
+        tree = ast.parse(f.read(), filename=path)
+
+    records = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name == 'transform':
+                    doc = ast.get_docstring(item)
+                    if doc:
+                        info = extract_from_docstring(doc)
+                        records.append(info)
+    return records
+
+
+def main():
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <python_source_file.py>")
+        sys.exit(1)
+
+    path = sys.argv[1]
+    records = analyze_file(path)
+    if not records:
+        print("No `transform` methods with docstrings found.")
+        return
+
+    # Build a Polars DataFrame
+    df = pl.DataFrame(
+        {
+            "producer":        [r["producer"]        for r in records],
+            "primary_source":  [r["primary_source"]  for r in records],
+            "source_cols":     [r["source_cols"]     for r in records],
+            "transform_cols":  [r["transform_cols"]  for r in records],
+            "enrichment_cols": [r["enrichment_cols"] for r in records],
+            "default_cols":    [r["default_cols"]    for r in records],
+        }
+    )
+    breakpoint()
+    print(df)
+
+
+if __name__ == "__main__":
+    main()
