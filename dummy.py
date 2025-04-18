@@ -80,23 +80,20 @@ def extract_from_docstring(doc: str):
 
 def analyze_file(path: str):
     """
-    Parse a Python file, find all 'transform' methods inside classes,
-    extract their docstrings, and pull structured information out.
+    Parse a Python file, find all classes named 'Transform',
+    extract their class docstrings, and pull structured information out.
     """
     with open(path, 'r', encoding='utf8') as f:
         tree = ast.parse(f.read(), filename=path)
 
     records = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            for item in node.body:
-                if isinstance(item, ast.FunctionDef) and item.name == 'transform':
-                    doc = ast.get_docstring(item)
-                    if doc:
-                        info = extract_from_docstring(doc)
-                        records.append(info)
+        if isinstance(node, ast.ClassDef) and node.name == 'Transform':
+            doc = ast.get_docstring(node)
+            if doc:
+                info = extract_from_docstring(doc)
+                records.append(info)
     return records
-
 
 def main():
     if len(sys.argv) != 2:
