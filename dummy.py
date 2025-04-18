@@ -120,6 +120,56 @@ def main():
     breakpoint()
     print(df)
 
+################legacy parser############################"
 
+def extract_matching_class_docstrings(path: str, var_name: str, target_value: str):
+    """
+    Scan the given Python file for classes where a class variable
+    `var_name` equals `target_value`, and return their docstrings
+    (or an explicit flag if missing).
+
+    Returns a list of dicts:
+      {
+        "class_name":    <str>,
+        "docstring":     <str or None>,
+        "has_docstring": <bool>
+      }
+    """
+    with open(path, 'r', encoding='utf8') as f:
+        tree = ast.parse(f.read(), filename=path)
+
+    results = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+
+        # Look for class variable assignment like `name = "OUSS"`
+        for stmt in node.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+
+            for target in stmt.targets:
+                if isinstance(target, ast.Name) and target.id == var_name:
+                    # Try to evaluate the assigned value
+
+                        # Handles ast.Constant, ast.Str, ast.Num, lists, dicts, etc.
+                    assigned = ast.literal_eval(stmt.value)
+
+
+                    if assigned == target_value:
+                        doc = ast.get_docstring(node)
+                        results.append({
+                            "class_name":    node.name,
+                            "docstring":     doc,
+                            "has_docstring": bool(doc),
+                        })
+    return results
+
+# Example usage
 if __name__ == "__main__":
-    main()
+    matches = extract_matching_class_docstrings("a1.py", "name", "miss")
+    for info in matches:
+        if info["has_docstring"]:
+            print(f"Class {info['class_name']} docstring:\n{info['docstring']}\n")
+        else:
+            print(f"Class {info['class_name']} has no docstring.\n")
