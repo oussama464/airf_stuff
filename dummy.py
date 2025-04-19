@@ -4,63 +4,73 @@ import sys
 
 import polars as pl
 
-# Regex patterns to identify pieces in the docstring
-DOC_PRODUCER       = re.compile(r'Producer of\s+`([^`]+)`', re.IGNORECASE)
-DOC_PRIMARY_SOURCE = re.compile(r'Primary Source:\s+`([^`]+)`', re.IGNORECASE)
-BACKTICK_COL       = re.compile(r'`(\w+)`')
-SECTION_HEADER     = re.compile(r'^(Filtering|Transformation|Enrichment|Default):', re.IGNORECASE)
+from typing import Any
 
-# Patterns for extracting specific columns in each section
-TRANSFORM_LINE = re.compile(r'^\s*-\s*(\w+)\s*:', re.IGNORECASE)
-ENRICH_LINE    = re.compile(r'^\s*-\s*(\w+)\s+from', re.IGNORECASE)
-DEFAULT_LINE   = re.compile(r'^\s*-\s*(\w+)', re.IGNORECASE)
+class DocRegexps:
+    DOC_PRODUCER = re.compile(
+        r"^\s*Producer of\s+`([^`]+?)`\s*\.?$", re.IGNORECASE | re.MULTILINE
+    )
+    DOC_PRIMARY_SOURCE = re.compile(
+        r"^\s*Primary Source\s*:\s*`([^`]+?)`\s*\.?$", re.IGNORECASE | re.MULTILINE
+    )
+    BACKTICK_COL = re.compile(r"`([^`]+?)`")
+
+    # Section headers may be prefixed with parentheses or indentation
+    SECTION_HEADER = re.compile(
+        r"^\s*\(?\s*(Filtering|Transformation|Enrichment|Default)\s*\)?:\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+    # Item lines can start with optional hyphen or asterisk, then col_name:
+    ITEM_LINE = re.compile(r"^\s*(?:[-*]\s*)?([A-Za-z_]\w*)\s*:", re.IGNORECASE)
 
 
-def extract_from_docstring(doc: str):
+def extract_from_docstring(docstring: str) -> dict[str,Any]:
     """
-    Parse a transform-method docstring to extract:
+    Given a class-level docstring, extract:
       - producer
       - primary_source
-      - source_cols (from Filtering section)
-      - transform_cols (from Transformation section)
-      - enrichment_cols (from Enrichment section)
-      - default_cols (from Default section)
+      - source_cols (backtick columns in Filtering section)
+      - transform_cols (cols named in Transformation section)
+      - enrichment_cols (cols named in Enrichment section)
+      - default_cols (cols named in Default section)
     """
-    # Find producer and primary source
-    producer_match       = DOC_PRODUCER.search(doc)
-    primary_source_match = DOC_PRIMARY_SOURCE.search(doc)
+    # Extract producer and primary source
+    producer_match = DocRegexps.DOC_PRODUCER.search(docstring)
+    primary_source_match = DocRegexps.DOC_PRIMARY_SOURCE.search(docstring)
 
-    # Containers for each category
-    source_cols     = []
-    transform_cols  = []
+    source_cols = []
+    transform_cols = []
     enrichment_cols = []
-    default_cols    = []
-
-    # Track current section
+    default_cols = []
     current_section = None
-    for line in doc.splitlines():
-        header = SECTION_HEADER.match(line)
-        if header:
-            current_section = header.group(1).lower()
+
+    for line in docstring.splitlines():
+        # Section headers
+        sec = DocRegexps.SECTION_HEADER.match(line)
+        if sec:
+            current_section = sec.group(1).lower()
             continue
 
-        if current_section == 'filtering':
-            # collect backtick-quoted column names
-            for col in BACKTICK_COL.findall(line):
-                source_cols.append(col)
+        # Filtering: grab backtick-quoted names
+        if current_section == "filtering":
+            source_cols.extend(DocRegexps.BACKTICK_COL.findall(line))
 
-        elif current_section == 'transformation':
-            m = TRANSFORM_LINE.match(line)
+        # Transformation: lines like 'col_name:'
+        elif current_section == "transformation":
+            m = DocRegexps.ITEM_LINE.match(line)
             if m:
                 transform_cols.append(m.group(1))
 
-        elif current_section == 'enrichment':
-            m = ENRICH_LINE.match(line)
+        # Enrichment: same pattern
+        elif current_section == "enrichment":
+            m = DocRegexps.ITEM_LINE.match(line)
             if m:
                 enrichment_cols.append(m.group(1))
 
-        elif current_section == 'default':
-            m = DEFAULT_LINE.match(line)
+        # Default: same pattern
+        elif current_section == "default":
+            m = DocRegexps.ITEM_LINE.match(line)
             if m:
                 default_cols.append(m.group(1))
 
@@ -69,13 +79,21 @@ def extract_from_docstring(doc: str):
         return list(dict.fromkeys(seq))
 
     return {
-        'producer':        producer_match.group(1) if producer_match else None,
-        'primary_source':  primary_source_match.group(1) if primary_source_match else None,
-        'source_cols':     dedupe(source_cols),
-        'transform_cols':  dedupe(transform_cols),
-        'enrichment_cols': dedupe(enrichment_cols),
-        'default_cols':    dedupe(default_cols),
+        "producer": producer_match.group(1) if producer_match else None,
+        "primary_source": primary_source_match.group(1)
+        if primary_source_match
+        else None,
+        "source_cols": dedupe(source_cols),
+        "transform_cols": dedupe(transform_cols),
+        "enrichment_cols": dedupe(enrichment_cols),
+        "default_cols": dedupe(default_cols),
     }
+
+
+def main():
+
+    result = extract_from_docstring(docstring)
+    pprint(result)
 
 
 def analyze_file(path: str):
