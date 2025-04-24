@@ -6,6 +6,59 @@ import polars.selectors as cs
 from datetime import datetime, timedelta
 import random
 
+import re
+from datetime import datetime, date
+import hashlib
+
+# Regex to capture base filename, control_date, and generation_ts
+# Example: MARKET_DEPTH_2024-10-28_2024-10-29_07-34-10.parquet
+EXTRACTION_PATTERN = re.compile(
+    r"""^
+        (?P<base>.+?)
+        _(?P<control>\d{4}-\d{2}-\d{2})
+        _(?P<gen>\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})
+        (?:\..+)?$
+    """,
+    re.VERBOSE
+)
+
+def get_control_and_generation_ts(filename: str) -> tuple[str, date, datetime]:
+    """
+    Extracts the base filename (without dates), control_date, and generation timestamp.
+    
+    Example:
+        MARKET_DEPTH_2024-10-28_2024-10-29_07-34-10.parquet
+        -> ("MARKET_DEPTH", date(2024, 10, 28), datetime(2024, 10, 29, 7, 34, 10))
+    """
+    match = EXTRACTION_PATTERN.match(filename)
+    if not match:
+        raise ValueError(f"No base/control_date/generation_ts in '{filename}'")
+
+    base = match.group("base")
+    control_date = datetime.strptime(match.group("control"), "%Y-%m-%d").date()
+    gen_ts = datetime.strptime(match.group("gen"), "%Y-%m-%d_%H-%M-%S")
+    return base, control_date, gen_ts
+
+
+def filter_by_latest_generation_ts(dq_file_names: list[str]) -> list[str]:
+    """
+    For each combination of control_date & base filename (no dates suffix),
+    keep only the file with the highest generation_ts.
+    Returns a list of the selected filenames.
+    """
+    best_by_hash: dict[str, tuple[str, str, date, datetime]] = {}
+
+    for fn in dq_file_names:
+        base, ctrl_date, gen_ts = get_control_and_generation_ts(fn)
+        key_str = f"{ctrl_date.isoformat()}_{base}"
+        hash_key = hashlib.md5(key_str.encode('utf-8')).hexdigest()
+
+        # keep only the newest file per control_date + base
+        if hash_key not in best_by_hash or gen_ts > best_by_hash[hash_key][3]:
+            best_by_hash[hash_key] = (fn, base, ctrl_date, gen_ts)
+
+    return [fn for fn, *_ in best_by_hash.values()]
+
 EXTRACTION_PATTERN = re.compile(
     r"_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})"
 )
