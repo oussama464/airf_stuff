@@ -1,39 +1,31 @@
-import polars as pl
 
-schema = {
-    "dataset": pl.Utf8(),  # note the ()
-    "filename": pl.Utf8(),
-    "control_date": pl.Date(),  # Date instance
-    "generation_ts": pl.Datetime("ns"),  # datetime with ns precision
-    "total_rows_per_file": pl.Int64(),
-    "not_null_rows_count_per_file": pl.Int64(),
-}
+def docstring_lint_check(sections_dict):
+    required = ["Default", "Enrichment", "Filtering", "Transformation"]
 
-df = pl.read_json("synthetic_metadata.json").with_columns(
-    pl.col("control_date").cast(pl.Date), pl.col("generation_ts").str.to_datetime()
-)
+    for sec in required:
+        text = sections_dict.get(sec)
+        if text is None:
+            raise ValueError(f"Missing section “{sec}”")
 
-df_dataset = (
-    df.group_by("dataset")
-    .agg(
-        [
-            pl.len().alias("total_dq_files"),
-            pl.sum("total_rows_per_file").alias("total_rows"),
-            pl.sum("not_null_rows_count_per_file").alias("total_errors"),
-        ]
-    )
-    .with_columns(pct_error_rate=100 * pl.col("total_errors") / pl.col("total_rows"))
-)
+        # if the section is exactly "None.", skip all validation
+        if text.strip() == "None.":
+            continue
 
-df_dataset_control_date = (
-    df.group_by(["dataset", "control_date"])
-    .agg(
-        [
-            pl.len().alias("total_dq_files"),
-            pl.sum("total_rows_per_file").alias("total_rows"),
-            pl.sum("not_null_rows_count_per_file").alias("total_errors"),
-        ]
-    )
-    .with_columns(pct_error_rate=100 * pl.col("total_errors") / pl.col("total_rows"))
-    .sort("control_date")
-)
+        # 1) at least one bullet anywhere?
+        if not re.search(r"-\s+", text):
+            raise ValueError(f"Section “{sec}” has no bullets (no “- ” found).")
+
+        # 2) check every bullet-line for exactly 4 spaces before the dash
+        for m in re.finditer(r"^(\s*)-\s+", text, flags=re.MULTILINE):
+            indent = len(m.group(1))
+            if indent != 4:
+                lineno = text[: m.start()].count("\n") + 1
+                raise ValueError(
+                    f"Section “{sec}”, line {lineno}: "
+                    f"bullet is indented {indent} spaces (should be 4)."
+                )
+
+
+# run
+docstring_lint_check(sections)
+
