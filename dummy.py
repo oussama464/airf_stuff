@@ -1,29 +1,50 @@
-
-def docstring_lint_check(sections_dict):
-    required = ["Default", "Enrichment", "Filtering", "Transformation"]
-
+def validate_sections(sections):
+    """
+    sections is a d
+    This function will:
+      * error if any of the 4 keys is missing
+      * skip any section whose stripped content is "None" or "None."
+      * for all other sections, error if any non-blank line
+        • doesn’t begin with exactly four spaces, or
+        • after those four spaces, doesn’t begin with "- "
+    """
+    required = ["Default", "Enrichment", "filtering", "Transformation"]
     for sec in required:
-        text = sections_dict.get(sec)
-        if text is None:
-            raise ValueError(f"Missing section “{sec}”")
+        if sec not in sections:
+            raise KeyError(f"Missing section: {sec!r}")
 
-        # if the section is exactly "None.", skip all validation
-        if text.strip() == "None.":
+        content = sections[sec]
+        # if the whole section is literally "None" or "None.", skip validation
+        if content.strip() in ("None", "None."):
             continue
 
-        # 1) at least one bullet anywhere?
-        if not re.search(r"-\s+", text):
-            raise ValueError(f"Section “{sec}” has no bullets (no “- ” found).")
+        for i, line in enumerate(content.splitlines(), start=1):
+            if not line.strip():
+                # skip blank lines
+                continue
 
-        # 2) check every bullet-line for exactly 4 spaces before the dash
-        for m in re.finditer(r"^(\s*)-\s+", text, flags=re.MULTILINE):
-            indent = len(m.group(1))
-            if indent != 4:
-                lineno = text[: m.start()].count("\n") + 1
+            # 1) exactly four spaces?
+            if not line.startswith("    "):
                 raise ValueError(
-                    f"Section “{sec}”, line {lineno}: "
-                    f"bullet is indented {indent} spaces (should be 4)."
+                    f"{sec!r}, line {i}: bad indentation (need 4 spaces): {line!r}"
                 )
+
+            # 2) after those four spaces, must start with "- "
+            if not line[4:].startswith("- "):
+                raise ValueError(
+                    f"{sec!r}, line {i}: missing '-' after indentation: {line!r}"
+                )
+
+    return True
+
+
+# example usage
+sections = {
+}
+
+validate_sections(sections)
+print("✅ all non-None sections are valid!")
+
 
 
 # run
