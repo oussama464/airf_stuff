@@ -1,3 +1,19 @@
+import re
+from functools import cached_property
+from typing import Dict
+
+class Example:
+    docstring = """..."""  # your multi-line docstring
+
+    @cached_property
+    def sections(self) -> Dict[str, str]:
+        section_names = ["Filtering", "Transformation", "Enrichment", "Default"]
+        pattern = rf"(?P<section>{'|'.join(section_names)}):\n(?P<content>.*?)(?=\n(?:{'|'.join(section_names)})?:|\Z)"
+        matches = re.finditer(pattern, self.docstring, re.DOTALL)
+        sections = {m.group('section'): m.group('content') for m in matches}
+        return sections
+
+
 def validate_sections(sections):
     """
     sections is a d
