@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 
+https://github.com/PacktPublishing/Apache-Airflow-Best-Practices/tree/main/chapter-06
 
 def camel_to_snake(name: str) -> str:
     # 1) Split before a capital followed by lowercase
