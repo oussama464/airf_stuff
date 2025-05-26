@@ -1,93 +1,90 @@
-# tests/test_card_source.py
-
+import argparse
 import logging
-import pytest
-import trio
+import re
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
 
-from card import CardSource, MAX_REQUEST_SENT
-from card import ImadResponse  # your real response type
-
-
-class DummyResponse(ImadResponse):
-    """
-    A minimal stand-in for your real ImadResponse.
-    """
-    def __init__(self, identifier: str, status_code: int):
-        self.identifier = identifier
-        self.status_code = status_code
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, DummyResponse)
-            and self.identifier == other.identifier
-            and self.status_code == other.status_code
-        )
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+PATTERN = r"^OUSS_(\d{4}-\d{2}-\d{2})-.*$"
 
 
-@pytest.fixture
-def source_with_missing(monkeypatch):
-    # 1) Create an “empty” CardSource and give it a list of identifiers
-    source = CardSource.__new__(CardSource)
-    source.identifiers = ["b", "a", "c"]
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Delete folders older than one week based on their names."
+    )
+    parser.add_argument(
+        "--date",
+        required=True,
+        help="Reference date in YYYY-MM-DD format (calculations are relative to this date).",
+    )
+    parser.add_argument(
+        "--path",
+        required=True,
+        type=Path,
+        help="Path to the directory containing folders to evaluate.",
+    )
 
-    # 2) Ensure the semaphore limit is high enough
-    monkeypatch.setattr("card.MAX_REQUEST_SENT", len(source.identifiers))
-
-    # 3) Prepare fake responses: 'b' → 404, others → 200
-    responses = {
-        "a": DummyResponse("a", 200),
-        "b": DummyResponse("b", 404),
-        "c": DummyResponse("c", 200),
-    }
-
-    async def fake_send_request(self, identifier):
-        # emulate network I/O
-        await trio.sleep(0)
-        return responses[identifier]
-
-    monkeypatch.setattr(CardSource, "_send_request", fake_send_request)
-    return source, list(responses.values())
-
-
-@pytest.fixture
-def source_all_ok(monkeypatch):
-    source = CardSource.__new__(CardSource)
-    source.identifiers = ["x", "y", "z"]
-    monkeypatch.setattr("card.MAX_REQUEST_SENT", len(source.identifiers))
-
-    responses = {
-        k: DummyResponse(k, 200) for k in source.identifiers
-    }
-
-    async def fake_send_request(self, identifier):
-        await trio.sleep(0)
-        return responses[identifier]
-
-    monkeypatch.setattr(CardSource, "_send_request", fake_send_request)
-    return source, list(responses.values())
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without actually deleting.",
+    )
+    return parser.parse_args()
 
 
-@pytest.mark.trio
-async def test_send_bulk_request_sorts_and_logs_missing(source_with_missing, caplog):
-    source, expected = source_with_missing
-    caplog.set_level(logging.INFO)
-
-    results = await source._send_bulk_request()
-
-    # should return them sorted by .identifier
-    assert results == sorted(expected, key=lambda r: r.identifier)
-
-    # and log about the single missing identifier "b"
-    assert "1 identifiers are not in the CARD database: b" in caplog.text
+def extract_date_from_name(name: str, pattern: str) -> datetime | None:
+    match = re.match(pattern, name)
+    if match:
+        date_str = match.group(1)
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            logging.warning(f"Invalid date format in folder name: {name}")
+    return None
 
 
-@pytest.mark.trio
-async def test_send_bulk_request_no_log_when_all_present(source_all_ok, caplog):
-    source, expected = source_all_ok
-    caplog.set_level(logging.INFO)
+def main():
+    args = parse_args()
 
-    results = await source._send_bulk_request()
+    try:
+        ref_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+    except ValueError:
+        logging.error("Provided date is not in YYYY-MM-DD format.")
+        return
 
-    assert results == sorted(expected, key=lambda r: r.identifier)
-    # no INFO‐level message at all
-    assert caplog.text.strip() == ""
+    threshold = ref_date - timedelta(weeks=1)
+    logging.info(f"Reference date: {ref_date}, threshold date: {threshold}")
+
+    if not args.path.is_dir():
+        logging.error(f"Provided path is not a directory: {args.path}")
+        return
+
+    for entry in args.path.iterdir():
+        if not entry.is_dir():
+            continue
+
+        folder_date = extract_date_from_name(entry.name, PATTERN)
+        if folder_date is None:
+            logging.debug(f"Skipping folder with non-matching name: {entry.name}")
+            continue
+
+        if folder_date <= threshold:
+            if args.dry_run:
+                logging.info(f"[Dry run] Would delete: {entry}")
+            else:
+                try:
+                    shutil.rmtree(entry)
+                    logging.info(f"Deleted folder: {entry}")
+                except Exception as e:
+                    logging.error(f"Failed to delete {entry}: {e}")
+        else:
+            logging.debug(f"Keeping folder: {entry.name} (date {folder_date})")
+
+
+if __name__ == "__main__":
+    main()
