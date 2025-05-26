@@ -88,3 +88,97 @@ def main():
 
 if __name__ == "__main__":
     main()
+=========================================tests========================================================
+import sys
+import pytest
+from pathlib import Path
+from datetime import date
+
+import delete_old_folders_cli as cli
+
+
+def test_extract_date_valid():
+    name = "OUSS_2025-05-26-abc"
+    result = cli.extract_date_from_name(name, cli.PATTERN)
+    assert result == date(2025, 5, 26)
+
+
+def test_extract_date_invalid_format(caplog):
+    name = "OUSS_2025-13-01-abc"
+    caplog.set_level("WARNING")
+    result = cli.extract_date_from_name(name, cli.PATTERN)
+    assert result is None
+    assert any("Invalid date format in folder name" in rec.message for rec in caplog.records)
+
+
+def test_extract_date_no_match():
+    name = "OTHER_2025-05-26-abc"
+    result = cli.extract_date_from_name(name, cli.PATTERN)
+    assert result is None
+
+
+def test_parse_args(tmp_path, monkeypatch):
+    test_args = ["prog", "--date", "2025-05-26", "--path", str(tmp_path)]
+    monkeypatch.setattr(sys, "argv", test_args)
+    args = cli.parse_args()
+    assert args.date == "2025-05-26"
+    assert isinstance(args.path, Path) and args.path == tmp_path
+    assert args.dry_run is False
+
+
+def test_main_dry_run(tmp_path, caplog, monkeypatch):
+    # Setup folders
+    ref_date = date(2025, 5, 26)
+    older = tmp_path / "OUSS_2025-05-18-aaa"
+    newer = tmp_path / "OUSS_2025-05-20-bbb"
+    older.mkdir()
+    newer.mkdir()
+    # Prepare args
+    monkeypatch.setattr(sys, "argv", ["prog", "--date", ref_date.isoformat(), "--path", str(tmp_path), "--dry-run"])
+    caplog.set_level("INFO")
+    # Run
+    cli.main()
+    # Check logs
+    assert any(f"[Dry run] Would delete: {older}" in rec.message for rec in caplog.records)
+    assert not any(f"[Dry run] Would delete: {newer}" in rec.message for rec in caplog.records)
+    # Ensure directories still exist
+    assert older.exists()
+    assert newer.exists()
+
+
+def test_main_delete(tmp_path, caplog, monkeypatch):
+    # Setup folders
+    ref_date = date(2025, 5, 26)
+    older = tmp_path / "OUSS_2025-05-18-xxx"
+    newer = tmp_path / "OUSS_2025-05-20-yyy"
+    older.mkdir()
+    newer.mkdir()
+    # Monkeypatch rmtree
+    deleted = []
+    def fake_rmtree(path):
+        deleted.append(Path(path))
+    monkeypatch.setattr(cli.shutil, "rmtree", fake_rmtree)
+    monkeypatch.setattr(sys, "argv", ["prog", "--date", ref_date.isoformat(), "--path", str(tmp_path)])
+    caplog.set_level("INFO")
+    # Run
+    cli.main()
+    # Only older should be deleted
+    assert older in deleted
+    assert newer not in deleted
+
+
+def test_main_invalid_date(tmp_path, caplog, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog", "--date", "invalid", "--path", str(tmp_path)])
+    caplog.set_level("ERROR")
+    cli.main()
+    assert any("Provided date is not in YYYY-MM-DD format." in rec.message for rec in caplog.records)
+
+
+def test_main_invalid_path(tmp_path, caplog, monkeypatch):
+    # Create a file, not a dir
+    file_path = tmp_path / "notadir"
+    file_path.write_text("hello")
+    monkeypatch.setattr(sys, "argv", ["prog", "--date", "2025-05-26", "--path", str(file_path)])
+    caplog.set_level("ERROR")
+    cli.main()
+    assert any("Provided path is not a directory" in rec.message for rec in caplog.records)
